@@ -29,7 +29,51 @@
   let redScore = 0;
   let kickoffTimer = 0;
   let goalTextTimer = 0;
+  let goalCelebration = null;
+  let goalReplay = null;
+  const replayHistory = [];
+  const REPLAY_HISTORY_MAX = 180;
+  const REPLAY_DURATION = 120; // 2s
+  const CELEBRATION_DURATION = 300; // 5s total
+  let camera = { x: W / 2, y: H / 2, zoom: 1 };
   let lastTime = performance.now();
+
+  const TEAMS = {
+    brasil: { name: "Brasil", color: "#169b62", light: "#ffe81f" },
+    argentina: { name: "Argentina", color: "#74acdf", light: "#ffffff" },
+    franca: { name: "França", color: "#0055a4", light: "#ef4135" },
+    alemanha: { name: "Alemanha", color: "#111111", light: "#dd0000" },
+    espanha: { name: "Espanha", color: "#aa151b", light: "#f1bf00" },
+    portugal: { name: "Portugal", color: "#046a38", light: "#da291c" },
+    italia: { name: "Itália", color: "#009246", light: "#ce2b37" },
+    inglaterra: { name: "Inglaterra", color: "#ffffff", light: "#cf142b" },
+    holanda: { name: "Países Baixos", color: "#ae1c28", light: "#21468b" },
+    belgica: { name: "Bélgica", color: "#111111", light: "#fdd835" },
+    croacia: { name: "Croácia", color: "#ff0000", light: "#ffffff" },
+    uruguai: { name: "Uruguai", color: "#5ab0e6", light: "#ffffff" },
+    colombia: { name: "Colômbia", color: "#fcd116", light: "#003893" },
+    mexico: { name: "México", color: "#006847", light: "#ce1126" },
+    eua: { name: "Estados Unidos", color: "#3c3b6e", light: "#b22234" },
+    japao: { name: "Japão", color: "#ffffff", light: "#bc002d" },
+    coreia: { name: "Coreia do Sul", color: "#cd2e3a", light: "#0f64cd" },
+    marrocos: { name: "Marrocos", color: "#c1272d", light: "#006233" },
+    senegal: { name: "Senegal", color: "#00853f", light: "#fdef42" },
+    nigeria: { name: "Nigéria", color: "#008751", light: "#ffffff" },
+    camaroes: { name: "Camarões", color: "#007a5e", light: "#ce1126" },
+    chile: { name: "Chile", color: "#d52b1e", light: "#0039a6" },
+    peru: { name: "Peru", color: "#d91023", light: "#ffffff" },
+    ecuador: { name: "Equador", color: "#ffdd00", light: "#034ea2" },
+    canada: { name: "Canadá", color: "#d80621", light: "#ffffff" },
+    australia: { name: "Austrália", color: "#012169", light: "#ffcd00" },
+    dinamarca: { name: "Dinamarca", color: "#c8102e", light: "#ffffff" },
+    suecia: { name: "Suécia", color: "#006aa7", light: "#fecc00" },
+    noruega: { name: "Noruega", color: "#ba0c2f", light: "#00205b" },
+    polonia: { name: "Polônia", color: "#ffffff", light: "#dc143c" },
+    servia: { name: "Sérvia", color: "#c6363c", light: "#0c4076" },
+    turquia: { name: "Turquia", color: "#e30a17", light: "#ffffff" },
+    suica: { name: "Suíça", color: "#d52b1e", light: "#ffffff" },
+    estados_arabes: { name: "Arábia Saudita", color: "#006c35", light: "#ffffff" }
+  };
 
   const SHIRTS = {
     blue:   { color: "#2688df", light: "#a8d6ff" },
@@ -68,13 +112,44 @@
     kickoffTimer = 55;
   }
 
+  function beginGoalCelebration(scoringPlayer) {
+    const frames = replayHistory.slice(-REPLAY_DURATION).map(f => ({
+      p1: { ...f.p1 }, p2: { ...f.p2 }, ball: { ...f.ball }
+    }));
+    goalReplay = { frames, index: 0, timer: REPLAY_DURATION };
+    goalCelebration = { player: scoringPlayer, timer: CELEBRATION_DURATION, duration: CELEBRATION_DURATION };
+    ball.vx = 0;
+    ball.vy = 0;
+    p1.vx = p1.vy = 0;
+    p2.vx = p2.vy = 0;
+    p1.charging = p2.charging = false;
+    p1.charge = p2.charge = 0;
+  }
+
+  function updateCamera() {
+    const replayFrame = goalReplay && goalReplay.frames[goalReplay.index];
+    const target = goalReplay && goalReplay.timer > 0 && replayFrame
+      ? replayFrame.ball
+      : (goalCelebration ? goalCelebration.player : null);
+    const targetZoom = replayFrame && goalReplay.timer > 0 ? 2.15 : (target ? 1.48 : 1);
+    const targetX = target ? target.x : W / 2;
+    const targetY = target ? target.y : H / 2;
+
+    camera.x += (targetX - camera.x) * (target ? 0.11 : 0.08);
+    camera.y += (targetY - camera.y) * (target ? 0.11 : 0.08);
+    camera.zoom += (targetZoom - camera.zoom) * (target ? 0.10 : 0.08);
+  }
+
   function startGame(mode) {
     twoPlayers = mode === 2;
-    const s1 = SHIRTS[p1Shirt.value];
-    const s2 = SHIRTS[p2Shirt.value];
+    const s1 = TEAMS[p1Shirt.value];
+    const s2 = TEAMS[p2Shirt.value];
     p1.color = s1.color; p1.light = s1.light;
     p2.color = s2.color; p2.light = s2.light;
 
+    goalCelebration = null;
+    goalReplay = null;
+    replayHistory.length = 0;
     blueScore = redScore = 0;
     blueScoreEl.textContent = "0";
     redScoreEl.textContent = "0";
@@ -180,15 +255,49 @@
     let dist = Math.hypot(dx, dy);
     const minDist = ball.r + p.r;
 
-    if (dist < minDist) {
-      if (dist < 0.001) dist = 0.001;
-      const nx = dx / dist, ny = dy / dist;
+    if (dist >= minDist) return;
+    if (dist < 0.001) dist = 0.001;
 
-      // Apenas separa a bola do jogador.
-      // NÃO altera a velocidade da bola.
-      const overlap = minDist - dist;
-      ball.x += nx * overlap;
-      ball.y += ny * overlap;
+    const nx = dx / dist, ny = dy / dist;
+    const tx = -ny, ty = nx;
+    const overlap = minDist - dist;
+
+    // Primeiro remove a penetração. O pequeno excesso evita que a bola
+    // fique vibrando dentro do jogador em velocidades baixas.
+    const correction = overlap + 0.35;
+    ball.x += nx * correction;
+    ball.y += ny * correction;
+
+    // Colisão dinâmica: a bola é leve e o jogador é mais pesado.
+    // Assim, a direção/velocidade do jogador realmente influencia a bola.
+    const relNormal = (ball.vx - p.vx) * nx + (ball.vy - p.vy) * ny;
+    const restitution = 0.62;
+
+    // Só aplica impulso quando os corpos estão se aproximando.
+    if (relNormal < 0) {
+      const invMassBall = 1.0;
+      const invMassPlayer = 0.16;
+      const impulse = -(1 + restitution) * relNormal / (invMassBall + invMassPlayer);
+
+      ball.vx += nx * impulse * invMassBall;
+      ball.vy += ny * impulse * invMassBall;
+      p.vx -= nx * impulse * invMassPlayer;
+      p.vy -= ny * impulse * invMassPlayer;
+
+      // Atrito tangencial: contatos de lado desviam a bola em vez de
+      // simplesmente quicá-la em linha reta.
+      const relTangent = (ball.vx - p.vx) * tx + (ball.vy - p.vy) * ty;
+      const tangentImpulse = -relTangent * 0.075;
+      ball.vx += tx * tangentImpulse;
+      ball.vy += ty * tangentImpulse;
+    }
+
+    // Limita a velocidade para evitar atravessamento e explosões numéricas.
+    const speed = Math.hypot(ball.vx, ball.vy);
+    const maxBallSpeed = 18.5;
+    if (speed > maxBallSpeed) {
+      ball.vx = ball.vx / speed * maxBallSpeed;
+      ball.vy = ball.vy / speed * maxBallSpeed;
     }
   }
 
@@ -239,8 +348,9 @@
   function updateBall() {
     ball.x += ball.vx;
     ball.y += ball.vy;
-    ball.vx *= 0.988;
-    ball.vy *= 0.988;
+    // Mais inércia: a bola desliza bastante antes de perder velocidade.
+    ball.vx *= 0.996;
+    ball.vy *= 0.996;
 
     if (ball.y - ball.r < FIELD.top) {
       ball.y = FIELD.top + ball.r;
@@ -269,18 +379,18 @@
   }
 
   function score(team) {
-    if (kickoffTimer > 0) return;
+    if (kickoffTimer > 0 || goalCelebration) return;
 
     if (team === "blue") {
       blueScore++;
       blueScoreEl.textContent = blueScore;
       showMessage("⚽ GOL!");
-      resetPositions(-1);
+      beginGoalCelebration(p1);
     } else {
       redScore++;
       redScoreEl.textContent = redScore;
       showMessage("⚽ GOL!");
-      resetPositions(1);
+      beginGoalCelebration(p2);
     }
   }
 
@@ -292,6 +402,35 @@
 
   function update() {
     if (paused) return;
+
+    if (goalCelebration) {
+      goalCelebration.timer--;
+
+      // Primeiros 2 segundos: replay do lance, com câmera acompanhando a bola.
+      if (goalReplay && goalReplay.timer > 0) {
+        goalReplay.index = Math.min(goalReplay.index + 1, Math.max(0, goalReplay.frames.length - 1));
+        goalReplay.timer--;
+      } else {
+        goalReplay = null;
+        // Últimos 3 segundos: comemoração aproximada no autor do gol.
+        const p = goalCelebration.player;
+        const t = goalCelebration.duration - goalCelebration.timer;
+        p.vx = Math.sin(t * 0.22) * 0.45;
+        p.vy = Math.cos(t * 0.18) * 0.30;
+        p.x = clamp(p.x + p.vx, FIELD.left + p.r, FIELD.right - p.r);
+        p.y = clamp(p.y + p.vy, FIELD.top + p.r, FIELD.bottom - p.r);
+      }
+
+      updateCamera();
+
+      if (goalCelebration.timer <= 0) {
+        const direction = goalCelebration.player === p1 ? -1 : 1;
+        goalCelebration = null;
+        goalReplay = null;
+        resetPositions(direction);
+      }
+      return;
+    }
 
     if (kickoffTimer > 0) kickoffTimer--;
 
@@ -306,15 +445,14 @@
       movePlayer(p2, ai.x, ai.y);
     }
 
-    const p1Kick = keys.has("e");
-    const p2Kick = twoPlayers ? (keys.has("control") || keys.has("ctrl")) : false;
+    const p1Kick = keys.has(" ");
+    const p2Kick = twoPlayers ? keys.has("p") : false;
 
     chargeKick(p1, p1Kick);
 
     if (twoPlayers) {
       chargeKick(p2, p2Kick);
     } else if (Math.hypot(ball.x - p2.x, ball.y - p2.y) < p2.r + ball.r + 25) {
-      // CPU faz um carregamento curto e solta.
       p2.charging = true;
       p2.charge = Math.min(p2.charge + 1.8, 40);
       if (p2.charge >= 40) releaseKick(p2);
@@ -328,17 +466,25 @@
 
     collidePlayers();
 
-    // Contato sem impulso: o jogador pode bloquear/encostar,
-    // mas só o chute muda a velocidade da bola.
+    // A bola se move primeiro; depois a colisão resolve penetração e
+    // transfere parte da velocidade do jogador para a bola.
+    updateBall();
     ballPlayerContact(p1);
     ballPlayerContact(p2);
-
-    updateBall();
 
     p1.x = clamp(p1.x, FIELD.left + p1.r, FIELD.right - p1.r);
     p1.y = clamp(p1.y, FIELD.top + p1.r, FIELD.bottom - p1.r);
     p2.x = clamp(p2.x, FIELD.left + p2.r, FIELD.right - p2.r);
     p2.y = clamp(p2.y, FIELD.top + p2.r, FIELD.bottom - p2.r);
+
+    replayHistory.push({
+      p1: { x: p1.x, y: p1.y },
+      p2: { x: p2.x, y: p2.y },
+      ball: { x: ball.x, y: ball.y }
+    });
+    if (replayHistory.length > REPLAY_HISTORY_MAX) replayHistory.shift();
+
+    updateCamera();
 
     if (goalTextTimer > 0) {
       goalTextTimer--;
@@ -436,11 +582,48 @@
   }
 
   function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(camera.zoom, camera.zoom);
+    ctx.translate(-camera.x, -camera.y);
+
     drawField();
-    drawBall();
-    drawDisc(p1, "#d6ecff", "#ffffff");
-    drawDisc(p2, "#ffd7da", "#ffffff");
-    drawLabels();
+    const replayFrame = goalReplay && goalReplay.timer > 0 && goalReplay.frames[goalReplay.index];
+    if (replayFrame) {
+      const rp1 = { ...p1, ...replayFrame.p1 };
+      const rp2 = { ...p2, ...replayFrame.p2 };
+      const rb = replayFrame.ball;
+      ctx.beginPath();
+      ctx.arc(rb.x, rb.y, ball.r, 0, Math.PI * 2);
+      ctx.fillStyle = "#f7f7f7";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#222b35";
+      ctx.stroke();
+      drawDisc(rp1, "#d6ecff", "#ffffff");
+      drawDisc(rp2, "#ffd7da", "#ffffff");
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(255,255,255,.85)";
+      ctx.fillText("P1", rp1.x, rp1.y - 34);
+      ctx.fillText(twoPlayers ? "P2" : "CPU", rp2.x, rp2.y - 34);
+    } else {
+      drawBall();
+      drawDisc(p1, "#d6ecff", "#ffffff");
+      drawDisc(p2, "#ffd7da", "#ffffff");
+      drawLabels();
+    }
+
+    ctx.restore();
+
+    if (goalCelebration) {
+      const progress = 1 - goalCelebration.timer / goalCelebration.duration;
+      const alpha = Math.sin(Math.min(1, progress) * Math.PI) * 0.08;
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx.fillRect(0, 0, W, H);
+    }
 
     if (paused) {
       ctx.fillStyle = "rgba(0,0,0,.48)";
@@ -470,13 +653,13 @@
   window.addEventListener("keydown", e => {
     const key = e.key.toLowerCase();
 
-    if (["arrowup","arrowdown","arrowleft","arrowright"," ","control"].includes(key)) {
+    if (["arrowup","arrowdown","arrowleft","arrowright"," ","p","0"].includes(key)) {
       e.preventDefault();
     }
 
-    if (key === "p" && !menu.classList.contains("hidden")) return;
+    if (key === "0" && !menu.classList.contains("hidden")) return;
 
-    if (key === "p" && !gameScreen.classList.contains("hidden")) {
+    if (key === "0" && !gameScreen.classList.contains("hidden")) {
       paused = !paused;
       return;
     }

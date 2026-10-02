@@ -5,9 +5,9 @@
 - Menu para escolher a camisa de cada jogador.
 - Modo 1 PLAYER contra CPU.
 - Modo 2 PLAYERS no mesmo teclado.
-- P1: WASD + E.
-- P2: Setas + Ctrl.
-- P1 e P2 usam Ctrl como tecla de chute do P2; P1 usa E.
+- P1: WASD + Espaço.
+- P2: Setas + P.
+- P1 usa Espaço como tecla de chute; P2 usa P.
 - Segurar a tecla de chute carrega a força.
 - Quanto mais tempo segurando, mais forte o chute.
 - Encostar no jogador NÃO empurra a bola.
@@ -18,14 +18,14 @@
 
 ### 1 Player
 P1: W A S D
-Chute: E
-Pausar: P
+Chute: Espaço
+Menu / Pausa: 0
 Menu: Esc
 
 ### 2 Players
 P1: W A S D + E
-P2: Setas + Ctrl
-Pausar: P
+P2: Setas + P
+Menu / Pausa: 0
 Menu: Esc
 
 ## Rodar com Java
