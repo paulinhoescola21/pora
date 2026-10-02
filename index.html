@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2D Football Arena</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <section id="menu" class="menu">
+      <h1>2D Football Arena</h1>
+      <p>Escolha as camisas e o modo de jogo.</p>
+
+      <div class="setup">
+        <div class="setup-card">
+          <h2>Player 1</h2>
+          <label for="p1Shirt">Camisa</label>
+          <select id="p1Shirt">
+            <option value="blue">Azul</option>
+            <option value="green">Verde</option>
+            <option value="yellow">Amarela</option>
+            <option value="white">Branca</option>
+            <option value="black">Preta</option>
+            <option value="purple">Roxa</option>
+          </select>
+          <p>Movimento: <b>W A S D</b></p>
+          <p>Chute: <b>E</b></p>
+        </div>
+
+        <div class="setup-card">
+          <h2>Player 2</h2>
+          <label for="p2Shirt">Camisa</label>
+          <select id="p2Shirt">
+            <option value="red">Vermelha</option>
+            <option value="orange">Laranja</option>
+            <option value="cyan">Ciano</option>
+            <option value="white">Branca</option>
+            <option value="black">Preta</option>
+            <option value="purple">Roxa</option>
+          </select>
+          <p>Movimento: <b>Setas</b></p>
+          <p>Chute: <b>Ctrl</b></p>
+        </div>
+      </div>
+
+      <div class="mode">
+        <button id="onePlayer" class="primary">1 PLAYER</button>
+        <button id="twoPlayer">2 PLAYERS</button>
+      </div>
+    </section>
+
+    <main id="gameScreen" class="hidden">
+      <header class="topbar">
+        <div>
+          <h1>2D Football Arena</h1>
+          <p id="modeText">1 PLAYER</p>
+        </div>
+        <div class="score">
+          <span id="blueScore">0</span>
+          <b>×</b>
+          <span id="redScore">0</span>
+        </div>
+      </header>
+
+      <section class="game-wrap">
+        <canvas id="game" width="1100" height="600"></canvas>
+        <div id="message" class="message">GO!</div>
+      </section>
+
+      <section class="controls">
+        <div><strong>P1</strong><span>WASD + E</span></div>
+        <div><strong>P2</strong><span>Setas + Ctrl</span></div>
+        <div><strong>Pausar</strong><span>P</span></div>
+        <div><strong>Menu</strong><span>Esc</span></div>
+      </section>
+
+      <button id="restart" type="button">Reiniciar partida</button>
+      <button id="backMenu" class="secondary" type="button">Voltar ao menu</button>
+    </main>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
